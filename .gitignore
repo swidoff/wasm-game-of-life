@@ -4,11 +4,4 @@ Cargo.lock
 bin/
 pkg/
 wasm-pack.log
-,idea/
-.idea/.gitignore
-.idea/codeStyles
-.idea/misc.xml
-.idea/modules.xml
-.idea/sbt.xml
-.idea/vcs.xml
-.idea/wasm-game-of-life.iml
+.idea/
