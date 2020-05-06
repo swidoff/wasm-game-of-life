@@ -1,8 +1,12 @@
 mod utils;
 
+extern crate web_sys;
+
+use web_sys::console;
 use wasm_bindgen::prelude::*;
 use std::fmt;
 use wasm_bindgen::__rt::core::fmt::Formatter;
+use itertools::Itertools;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -99,6 +103,31 @@ impl Universe {
             .collect();
 
         Universe { width, height, cells }
+    }
+
+    pub fn empty(width: u32, height: u32) -> Universe {
+        Universe { width, height, cells: (0..width * height).map(|_| Cell::Dead).collect_vec() }
+    }
+
+    pub fn add_space_ship(&mut self, row: u32, col: u32) {
+        let space_ship = [
+            [Cell::Dead, Cell::Alive, Cell::Dead, Cell::Dead, Cell::Alive],
+            [Cell::Alive, Cell::Dead, Cell::Dead, Cell::Dead, Cell::Dead],
+            [Cell::Alive, Cell::Dead, Cell::Dead, Cell::Dead, Cell::Alive],
+            [Cell::Alive, Cell::Alive, Cell::Alive, Cell::Alive, Cell::Dead],
+        ];
+
+        let coords = (0..4).cartesian_product(0..5)
+            .map(|(r, c)| {
+                let index = self.get_index((row + r) % self.height, (col + c) % self.width);
+                let cell = space_ship[r as usize][c as usize];
+                (index, cell)
+            })
+            .collect_vec();
+
+        for &(i, cell) in coords.iter() {
+            self.cells[i] = cell;
+        }
     }
 
     pub fn render(&self) -> String {
