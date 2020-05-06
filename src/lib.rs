@@ -8,6 +8,7 @@ use std::fmt;
 use wasm_bindgen::__rt::core::fmt::Formatter;
 use itertools::Itertools;
 use js_sys::Math;
+use fixedbitset::FixedBitSet;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -16,18 +17,10 @@ use js_sys::Math;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Cell {
-    Dead = 0,
-    Alive = 1,
-}
-
-#[wasm_bindgen]
 pub struct Universe {
     width: u32,
     height: u32,
-    cells: Vec<Cell>,
+    cells: FixedBitSet,
 
 }
 
@@ -41,8 +34,8 @@ impl Universe {
         self.height
     }
 
-    pub fn cells(&self) -> *const Cell {
-        self.cells.as_ptr()
+    pub fn cells(&self) -> *const u32 {
+        self.cells.as_slice().as_ptr()
     }
 
     fn get_index(&self, row: u32, column: u32) -> usize {
@@ -60,7 +53,7 @@ impl Universe {
                 let neighbor_row = (row + delta_row) % self.height;
                 let neighbor_col = (column + delta_col) % self.width;
                 let idx = self.get_index(neighbor_row, neighbor_col);
-                count += self.cells[idx] as u8;
+                count += if self.cells.contains(idx) { 1 } else { 0 };
             }
         }
 
@@ -73,57 +66,41 @@ impl Universe {
         for row in 0..self.height {
             for col in 0..self.width {
                 let idx = self.get_index(row, col);
-                let cell = self.cells[idx];
+                let cell = self.cells.contains(idx);
                 let live_neighbors = self.live_neighbor_count(row, col);
                 let next_cell = match (cell, live_neighbors) {
-                    (Cell::Alive, x) if x < 2 => Cell::Dead,
-                    (Cell::Alive, 2) | (Cell::Alive, 3) => Cell::Alive,
-                    (Cell::Alive, x) if x > 3 => Cell::Dead,
-                    (Cell::Dead, 3) => Cell::Alive,
+                    (true, x) if x < 2 => false,
+                    (true, 2) | (true, 3) => true,
+                    (true, x) if x > 3 => false,
+                    (false, 3) => true,
                     (otherwise, _) => otherwise,
                 };
-                next[idx] = next_cell;
+                next.set(idx, next_cell);
             }
         }
 
         self.cells = next;
     }
 
-    pub fn new() -> Universe {
-        let width = 64;
-        let height = 64;
-
-        let cells = (0..width * height)
-            .map(|i| {
-                if i % 2 == 0 || i % 7 == 0 {
-                    Cell::Alive
-                } else {
-                    Cell::Dead
-                }
-            })
-            .collect();
-
-        Universe { width, height, cells }
-    }
-
     pub fn empty(width: u32, height: u32) -> Universe {
-        let cells = (0..width * height).map(|_| Cell::Dead).collect_vec();
+        let cells = FixedBitSet::with_capacity((width * height) as usize);
         Universe { width, height, cells }
     }
 
     pub fn random(width: u32, height: u32, prob: f64) -> Universe {
-        let cells = (0..width * height)
-            .map(|_| if Math::random() < prob {Cell::Alive} else {Cell::Dead})
-            .collect_vec();
+        let mut cells = FixedBitSet::with_capacity((width * height) as usize);
+        for idx in 0..(width * height) as usize {
+            cells.set(idx, Math::random() < prob)
+        }
         Universe { width, height, cells }
     }
 
     pub fn add_space_ship(&mut self, row: u32, col: u32) {
         let space_ship = [
-            [Cell::Dead, Cell::Alive, Cell::Dead, Cell::Dead, Cell::Alive],
-            [Cell::Alive, Cell::Dead, Cell::Dead, Cell::Dead, Cell::Dead],
-            [Cell::Alive, Cell::Dead, Cell::Dead, Cell::Dead, Cell::Alive],
-            [Cell::Alive, Cell::Alive, Cell::Alive, Cell::Alive, Cell::Dead],
+            [false, true, false, false, true],
+            [true, false, false, false, false],
+            [true, false, false, false, true],
+            [true, true, true, true, false],
         ];
 
         let coords = (0..4).cartesian_product(0..5)
@@ -135,7 +112,7 @@ impl Universe {
             .collect_vec();
 
         for &(i, cell) in coords.iter() {
-            self.cells[i] = cell;
+            self.cells.set(i, cell);
         }
     }
 
@@ -146,9 +123,9 @@ impl Universe {
 
 impl fmt::Display for Universe {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for line in self.cells.as_slice().chunks(self.width as usize) {
-            for &cell in line {
-                let symbol = if cell == Cell::Dead { '◻' } else { '◼' };
+        for line in &(0..((self.width * self.height) as usize)).chunks(self.width as usize) {
+            for index in line {
+                let symbol = if self.cells.contains(index) { '◼' } else { '◻' };
                 write!(f, "{}", symbol)?;
             }
             write!(f, "\n")?
