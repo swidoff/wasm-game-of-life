@@ -42,6 +42,23 @@ impl Universe {
         (row * self.width + column) as usize
     }
 
+    /// Set the width of the universe.
+    ///
+    /// Resets all cells to the dead state.
+    pub fn set_width(&mut self, width: u32) {
+        self.width = width;
+        self.cells = Universe::new_cells(width, self.height)
+    }
+
+    /// Set the height of the universe.
+    ///
+    /// Resets all cells to the dead state.
+    pub fn set_height(&mut self, height: u32) {
+        self.height = height;
+        self.cells = Universe::new_cells(self.width, height)
+    }
+
+
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
         let mut count = 0;
         for delta_row in [self.height - 1, 0, 1].iter().cloned() {
@@ -83,8 +100,12 @@ impl Universe {
     }
 
     pub fn empty(width: u32, height: u32) -> Universe {
-        let cells = FixedBitSet::with_capacity((width * height) as usize);
+        let cells = Universe::new_cells(width, height);
         Universe { width, height, cells }
+    }
+
+    fn new_cells(width: u32, height: u32) -> FixedBitSet {
+        FixedBitSet::with_capacity((width * height) as usize)
     }
 
     pub fn random(width: u32, height: u32, prob: f64) -> Universe {
@@ -120,6 +141,19 @@ impl Universe {
         return self.to_string();
     }
 }
+
+impl Universe {
+    pub fn get_cells(&self) -> &FixedBitSet {
+        &self.cells
+    }
+
+    pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
+        for (row, col) in cells.iter().cloned() {
+            let idx = self.get_index(row, col);
+            self.cells.set(idx, true);
+        }
+    }
+ }
 
 impl fmt::Display for Universe {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
