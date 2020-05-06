@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 use std::fmt;
 use wasm_bindgen::__rt::core::fmt::Formatter;
 use itertools::Itertools;
+use js_sys::Math;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -106,7 +107,15 @@ impl Universe {
     }
 
     pub fn empty(width: u32, height: u32) -> Universe {
-        Universe { width, height, cells: (0..width * height).map(|_| Cell::Dead).collect_vec() }
+        let cells = (0..width * height).map(|_| Cell::Dead).collect_vec();
+        Universe { width, height, cells }
+    }
+
+    pub fn random(width: u32, height: u32, prob: f64) -> Universe {
+        let cells = (0..width * height)
+            .map(|_| if Math::random() < prob {Cell::Alive} else {Cell::Dead})
+            .collect_vec();
+        Universe { width, height, cells }
     }
 
     pub fn add_space_ship(&mut self, row: u32, col: u32) {
