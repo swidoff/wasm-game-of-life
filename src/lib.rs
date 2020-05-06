@@ -1,20 +1,27 @@
-mod utils;
-
 extern crate web_sys;
 
-use web_sys::console;
-use wasm_bindgen::prelude::*;
 use std::fmt;
-use wasm_bindgen::__rt::core::fmt::Formatter;
+
+use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 use js_sys::Math;
-use fixedbitset::FixedBitSet;
+use wasm_bindgen::__rt::core::fmt::Formatter;
+use wasm_bindgen::prelude::*;
+
+mod utils;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+// A macro to provide `println!(..)`-style syntax for `console.log` logging.
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
 
 #[wasm_bindgen]
 pub struct Universe {
@@ -100,6 +107,8 @@ impl Universe {
     }
 
     pub fn empty(width: u32, height: u32) -> Universe {
+        log!("Creating an empty universe of width {} and height {}", width, height);
+        utils::set_panic_hook();
         let cells = Universe::new_cells(width, height);
         Universe { width, height, cells }
     }
@@ -109,6 +118,7 @@ impl Universe {
     }
 
     pub fn random(width: u32, height: u32, prob: f64) -> Universe {
+        utils::set_panic_hook();
         let mut cells = FixedBitSet::with_capacity((width * height) as usize);
         for idx in 0..(width * height) as usize {
             cells.set(idx, Math::random() < prob)
@@ -153,7 +163,7 @@ impl Universe {
             self.cells.set(idx, true);
         }
     }
- }
+}
 
 impl fmt::Display for Universe {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

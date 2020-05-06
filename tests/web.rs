@@ -34,7 +34,7 @@ pub fn expected_spaceship() -> Universe {
 #[wasm_bindgen_test]
 pub fn test_tick() {
     let mut input_universe = input_spaceship();
-    let mut expected_universe = expected_spaceship();
+    let expected_universe = expected_spaceship();
 
     input_universe.tick();
     assert_eq!(&input_universe.get_cells(), &expected_universe.get_cells());
