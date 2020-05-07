@@ -65,6 +65,10 @@ impl Universe {
         self.cells = Universe::new_cells(self.width, height)
     }
 
+    pub fn toggle_cell(&mut self, row: u32, column: u32) {
+        let idx = self.get_index(row, column);
+        self.cells.toggle(idx);
+    }
 
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
         let mut count = 0;
@@ -119,31 +123,72 @@ impl Universe {
 
     pub fn random(width: u32, height: u32, prob: f64) -> Universe {
         utils::set_panic_hook();
-        let mut cells = FixedBitSet::with_capacity((width * height) as usize);
-        for idx in 0..(width * height) as usize {
-            cells.set(idx, Math::random() < prob)
+        let mut universe = Universe::empty(width, height);
+        universe.shuffle(prob);
+        universe
+    }
+
+    pub fn shuffle(&mut self, prob: f64) {
+        for idx in 0..self.cells.len() {
+            self.cells.set(idx, Math::random() < prob)
         }
-        Universe { width, height, cells }
+    }
+
+    pub fn clear(&mut self) {
+        self.cells.clear()
     }
 
     pub fn add_space_ship(&mut self, row: u32, col: u32) {
         let space_ship = [
-            [false, true, false, false, true],
-            [true, false, false, false, false],
-            [true, false, false, false, true],
-            [true, true, true, true, false],
+            false, true, false, false, true,
+            true, false, false, false, false,
+            true, false, false, false, true,
+            true, true, true, true, false,
         ];
 
-        let coords = (0..4).cartesian_product(0..5)
-            .map(|(r, c)| {
-                let index = self.get_index((row + r) % self.height, (col + c) % self.width);
-                let cell = space_ship[r as usize][c as usize];
-                (index, cell)
-            })
-            .collect_vec();
+        self.insert_at(row, col, &space_ship[..], 5, 4);
+    }
 
-        for &(i, cell) in coords.iter() {
-            self.cells.set(i, cell);
+    pub fn add_pulsar(&mut self, row: u32, col: u32) {
+        let pulsar = [
+            false, false, true, true, true, false, false, false, true, true, true, false, false,
+            false, false, false, false, false, false, false, false, false, false, false, false, false,
+            true, false, false, false, false, true, false, true, false, false, false, false, true,
+            true, false, false, false, false, true, false, true, false, false, false, false, true,
+            true, false, false, false, false, true, false, true, false, false, false, false, true,
+            false, false, true, true, true, false, false, false, true, true, true, false, false,
+            false, false, false, false, false, false, false, false, false, false, false, false, false,
+            false, false, true, true, true, false, false, false, true, true, true, false, false,
+            true, false, false, false, false, true, false, true, false, false, false, false, true,
+            true, false, false, false, false, true, false, true, false, false, false, false, true,
+            true, false, false, false, false, true, false, true, false, false, false, false, true,
+            false, false, false, false, false, false, false, false, false, false, false, false, false,
+            false, false, true, true, true, false, false, false, true, true, true, false, false,
+        ];
+
+        self.insert_at(row, col, &pulsar[..], 13, 13);
+    }
+
+
+    pub fn add_glider(&mut self, row: u32, col: u32) {
+        let glider = [
+            false, true, false,
+            false, false, true,
+            true, true, true,
+        ];
+
+        self.insert_at(row, col, &glider[..], 3, 3);
+    }
+
+
+    fn insert_at(&mut self, row: u32, col: u32, img: &[bool], width: u32, height: u32) {
+        for r in 0..height {
+            for c in 0..width {
+                let img_index = (r * width + c) as usize;
+                let value = img[img_index];
+                let index = self.get_index((row + r) % self.height, (col + c) % self.width);
+                self.cells.set(index, value)
+            }
         }
     }
 
