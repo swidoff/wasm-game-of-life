@@ -30,8 +30,8 @@ macro_rules! log {
 pub struct Universe {
     width: u32,
     height: u32,
-    cells: FixedBitSet,
-
+    cells: [FixedBitSet; 2],
+    i: usize,
 }
 
 #[wasm_bindgen]
@@ -45,7 +45,7 @@ impl Universe {
     }
 
     pub fn cells(&self) -> *const u32 {
-        self.cells.as_slice().as_ptr()
+        self.cells[self.i].as_slice().as_ptr()
     }
 
     fn get_index(&self, row: u32, column: u32) -> usize {
@@ -57,7 +57,10 @@ impl Universe {
     /// Resets all cells to the dead state.
     pub fn set_width(&mut self, width: u32) {
         self.width = width;
-        self.cells = Universe::new_cells(width, self.height)
+        self.cells = [
+            Universe::new_cells(width, self.height),
+            Universe::new_cells(width, self.height)
+        ];
     }
 
     /// Set the height of the universe.
@@ -65,40 +68,78 @@ impl Universe {
     /// Resets all cells to the dead state.
     pub fn set_height(&mut self, height: u32) {
         self.height = height;
-        self.cells = Universe::new_cells(self.width, height)
+        self.cells = [
+            Universe::new_cells(self.width, height),
+            Universe::new_cells(self.width, height)
+        ];
     }
 
     pub fn toggle_cell(&mut self, row: u32, column: u32) {
         let idx = self.get_index(row, column);
-        self.cells.toggle(idx);
+        self.cells[self.i].toggle(idx);
     }
 
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
         let mut count = 0;
-        for delta_row in [self.height - 1, 0, 1].iter().cloned() {
-            for delta_col in [self.width - 1, 0, 1].iter().cloned() {
-                if delta_row == 0 && delta_col == 0 {
-                    continue;
-                }
+        let north = if row == 0 {
+            self.height - 1
+        } else {
+            row - 1
+        };
 
-                let neighbor_row = (row + delta_row) % self.height;
-                let neighbor_col = (column + delta_col) % self.width;
-                let idx = self.get_index(neighbor_row, neighbor_col);
-                count += if self.cells.contains(idx) { 1 } else { 0 };
-            }
-        }
+        let south = if row == self.height - 1 {
+            0
+        } else {
+            row + 1
+        };
+
+        let west = if column == 0 {
+            self.width - 1
+        } else {
+            column - 1
+        };
+
+        let east = if column == self.width - 1 {
+            0
+        } else {
+            column + 1
+        };
+
+        let cells = &self.cells[self.i];
+        let nw = self.get_index(north, west);
+        count += cells[nw] as u8;
+
+        let n = self.get_index(north, column);
+        count += cells[n] as u8;
+
+        let ne = self.get_index(north, east);
+        count += cells[ne] as u8;
+
+        let w = self.get_index(row, west);
+        count += cells[w] as u8;
+
+        let e = self.get_index(row, east);
+        count += cells[e] as u8;
+
+        let sw = self.get_index(south, west);
+        count += cells[sw] as u8;
+
+        let s = self.get_index(south, column);
+        count += cells[s] as u8;
+
+        let se = self.get_index(south, east);
+        count += cells[se] as u8;
 
         count
     }
 
     pub fn tick(&mut self) {
         let _timer = Timer::new("Universe::tick");
-        let mut next = self.cells.clone();
-
+        let new_i = (self.i + 1) % 2;
         for row in 0..self.height {
             for col in 0..self.width {
                 let idx = self.get_index(row, col);
-                let cell = self.cells.contains(idx);
+                let cell = self.cells[self.i].contains(idx);
                 let live_neighbors = self.live_neighbor_count(row, col);
                 let next_cell = match (cell, live_neighbors) {
                     (true, x) if x < 2 => false,
@@ -107,18 +148,21 @@ impl Universe {
                     (false, 3) => true,
                     (otherwise, _) => otherwise,
                 };
-                next.set(idx, next_cell);
+                self.cells[new_i].set(idx, next_cell);
             }
         }
 
-        self.cells = next;
+        self.i = new_i;
     }
 
     pub fn empty(width: u32, height: u32) -> Universe {
         log!("Creating an empty universe of width {} and height {}", width, height);
         utils::set_panic_hook();
-        let cells = Universe::new_cells(width, height);
-        Universe { width, height, cells }
+        let cells = [
+            Universe::new_cells(width, height),
+            Universe::new_cells(width, height)
+        ];
+        Universe { width, height, cells, i: 0 }
     }
 
     fn new_cells(width: u32, height: u32) -> FixedBitSet {
@@ -133,13 +177,13 @@ impl Universe {
     }
 
     pub fn shuffle(&mut self, prob: f64) {
-        for idx in 0..self.cells.len() {
-            self.cells.set(idx, Math::random() < prob)
+        for idx in 0..self.cells[self.i].len() {
+            self.cells[self.i].set(idx, Math::random() < prob)
         }
     }
 
     pub fn clear(&mut self) {
-        self.cells.clear()
+        self.cells[self.i].clear()
     }
 
     pub fn add_space_ship(&mut self, row: u32, col: u32) {
@@ -191,7 +235,7 @@ impl Universe {
                 let img_index = (r * width + c) as usize;
                 let value = img[img_index];
                 let index = self.get_index((row + r) % self.height, (col + c) % self.width);
-                self.cells.set(index, value)
+                self.cells[self.i].set(index, value)
             }
         }
     }
@@ -203,13 +247,13 @@ impl Universe {
 
 impl Universe {
     pub fn get_cells(&self) -> &FixedBitSet {
-        &self.cells
+        &self.cells[self.i]
     }
 
     pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
         for (row, col) in cells.iter().cloned() {
             let idx = self.get_index(row, col);
-            self.cells.set(idx, true);
+            self.cells[self.i].set(idx, true);
         }
     }
 }
@@ -218,7 +262,7 @@ impl fmt::Display for Universe {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for line in &(0..((self.width * self.height) as usize)).chunks(self.width as usize) {
             for index in line {
-                let symbol = if self.cells.contains(index) { '◼' } else { '◻' };
+                let symbol = if self.cells[self.i].contains(index) { '◼' } else { '◻' };
                 write!(f, "{}", symbol)?;
             }
             write!(f, "\n")?
