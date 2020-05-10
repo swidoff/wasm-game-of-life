@@ -9,6 +9,9 @@ use wasm_bindgen::__rt::core::fmt::Formatter;
 use wasm_bindgen::prelude::*;
 
 mod utils;
+mod timer;
+
+use timer::Timer;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -89,6 +92,7 @@ impl Universe {
     }
 
     pub fn tick(&mut self) {
+        let _timer = Timer::new("Universe::tick");
         let mut next = self.cells.clone();
 
         for row in 0..self.height {
