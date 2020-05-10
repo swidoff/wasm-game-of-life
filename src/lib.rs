@@ -32,6 +32,7 @@ pub struct Universe {
     height: u32,
     cells: [FixedBitSet; 2],
     i: usize,
+    deltas: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -48,6 +49,19 @@ impl Universe {
         self.cells[self.i].as_slice().as_ptr()
     }
 
+    pub fn deltas(&self) -> *const u32 {
+        self.deltas.as_ptr()
+    }
+
+    pub fn num_deltas(&self) -> u32 {
+        return self.deltas.len() as u32
+    }
+
+    pub fn clear_deltas(&mut self) {
+        return self.deltas.clear()
+    }
+
+
     fn get_index(&self, row: u32, column: u32) -> usize {
         (row * self.width + column) as usize
     }
@@ -61,6 +75,7 @@ impl Universe {
             Universe::new_cells(width, self.height),
             Universe::new_cells(width, self.height)
         ];
+        self.deltas = Universe::new_deltas(width, self.height);
     }
 
     /// Set the height of the universe.
@@ -72,11 +87,13 @@ impl Universe {
             Universe::new_cells(self.width, height),
             Universe::new_cells(self.width, height)
         ];
+        self.deltas = Universe::new_deltas(self.width, height);
     }
 
     pub fn toggle_cell(&mut self, row: u32, column: u32) {
         let idx = self.get_index(row, column);
         self.cells[self.i].toggle(idx);
+        self.deltas.push(idx as u32);
     }
 
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
@@ -135,6 +152,7 @@ impl Universe {
 
     pub fn tick(&mut self) {
         let _timer = Timer::new("Universe::tick");
+
         let new_i = (self.i + 1) % 2;
         for row in 0..self.height {
             for col in 0..self.width {
@@ -149,6 +167,9 @@ impl Universe {
                     (otherwise, _) => otherwise,
                 };
                 self.cells[new_i].set(idx, next_cell);
+                if cell != next_cell {
+                    self.deltas.push(idx as u32);
+                }
             }
         }
 
@@ -162,11 +183,16 @@ impl Universe {
             Universe::new_cells(width, height),
             Universe::new_cells(width, height)
         ];
-        Universe { width, height, cells, i: 0 }
+        let deltas = Universe::new_deltas(width, height);
+        Universe { width, height, cells, i: 0, deltas }
     }
 
     fn new_cells(width: u32, height: u32) -> FixedBitSet {
         FixedBitSet::with_capacity((width * height) as usize)
+    }
+
+    fn new_deltas(width: u32, height: u32) -> Vec<u32> {
+        (0..(width*height)).collect_vec()
     }
 
     pub fn random(width: u32, height: u32, prob: f64) -> Universe {
@@ -180,10 +206,12 @@ impl Universe {
         for idx in 0..self.cells[self.i].len() {
             self.cells[self.i].set(idx, Math::random() < prob)
         }
+        self.deltas = Universe::new_deltas(self.width, self.height);
     }
 
     pub fn clear(&mut self) {
-        self.cells[self.i].clear()
+        self.cells[self.i].clear();
+        self.deltas = Universe::new_deltas(self.width, self.height);
     }
 
     pub fn add_space_ship(&mut self, row: u32, col: u32) {
@@ -235,7 +263,8 @@ impl Universe {
                 let img_index = (r * width + c) as usize;
                 let value = img[img_index];
                 let index = self.get_index((row + r) % self.height, (col + c) % self.width);
-                self.cells[self.i].set(index, value)
+                self.cells[self.i].set(index, value);
+                self.deltas.push(index as u32);
             }
         }
     }
@@ -254,6 +283,7 @@ impl Universe {
         for (row, col) in cells.iter().cloned() {
             let idx = self.get_index(row, col);
             self.cells[self.i].set(idx, true);
+            self.deltas.push(idx as u32);
         }
     }
 }
